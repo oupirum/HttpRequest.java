@@ -21,6 +21,8 @@ class HttpRequest {
 	public boolean COOKIES = true;
 	private ArrayList<String> cookies = new ArrayList<String>(5);
 	
+	public String defaultEncoding = "UTF-8";
+	
 	public HttpRequest() {
 		
 	}
@@ -34,7 +36,7 @@ class HttpRequest {
 	}
 	
 	public String GET(String url) {
-		return req(url, "GET", null, "UTF-8", 0);
+		return req(url, "GET", null, defaultEncoding, 0);
 	}
 	public String GET(String url, String responseEncoding) {
 		return req(url, "GET", null, responseEncoding, 0);
@@ -44,7 +46,7 @@ class HttpRequest {
 	}
 	
 	public String POST(String url, Map<String, Object> postData) {
-		return req(url, "POST", postData, "UTF-8", 0);
+		return req(url, "POST", postData, defaultEncoding, 0);
 	}
 	public String POST(String url, Map<String, Object> postData, String responseEncoding) {
 		return req(url, "POST", postData, responseEncoding, 0);
@@ -55,6 +57,10 @@ class HttpRequest {
 	
 	private String req(String url, String method, Map<String, Object> postData, String responseEncoding, int responseLength) {
 		String res = null;
+		
+		if (responseEncoding == null) {
+			responseEncoding = defaultEncoding;
+		}
 		
 		HttpURLConnection conn = openConnection(url, method, null);
 		if (conn != null) {
@@ -127,8 +133,8 @@ class HttpRequest {
 					else {
 						/*Its work faster */
 						char[] buffer = new char[responseLength];
-						reader.read(buffer);
-						resD = new String(buffer);
+						int len = reader.read(buffer);
+						resD = new String(buffer, 0, len);
 					}
 					
 					if (COOKIES) getCookieHeader(conn);
