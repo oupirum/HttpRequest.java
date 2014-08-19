@@ -1,4 +1,5 @@
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -17,6 +18,27 @@ import java.util.List;
 import java.util.Map;
 
 
+/*
+ * How to use: 
+	
+	String url = "http://site.net/huita.php";
+	HttpRequest http = new HttpRequest();
+	http.COOKIES = false;
+	
+	Map postData = new HashMap();
+	postData.put("var1", "Не надо Url-кодировать");
+	postData.put("var2", "HuiTka");
+	//Also may upload files: 
+	postData.put("file", new File("./file.gif"));
+	
+	String response = http.POST(url, postData, "UTF-8");
+*/
+
+/** 
+ * Sending GET & POST requests. JavaSE/Android. 
+ * 
+ * @author Constantine Oupirum
+ * */
 class HttpRequest {
 	public boolean COOKIES = true;
 	private ArrayList<String> cookies = new ArrayList<String>(5);
