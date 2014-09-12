@@ -6,6 +6,7 @@ String url = "http://site.net/huita.php";
 
 HttpRequest http = new HttpRequest();
 
+
 //Create POST-form: 
 Map postData = new HashMap();
 postData.put("var1", "Don't necessary to URL-encode. Путин ест детей.");
