@@ -1,49 +1,34 @@
+package test;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-
-/*
- * How to use: 
-	
-	String url = "http://site.net/huita.php";
-	HttpRequest http = new HttpRequest();
-	http.COOKIES = false;
-	
-	Map postData = new HashMap();
-	postData.put("var1", "Не надо Url-кодировать");
-	postData.put("var2", "HuiTka");
-	//Also may upload files: 
-	postData.put("file", new File("./file.gif"));
-	
-	String response = http.POST(url, postData, "UTF-8");
-*/
 
 /** 
  * Sending GET & POST requests. JavaSE/Android. 
  * 
  * @author Constantine Oupirum
+ * version 1.2, 01.09.14
  * */
 class HttpRequest {
 	public boolean COOKIES = true;
 	private ArrayList<String> cookies = new ArrayList<String>(5);
 	
 	public String defaultEncoding = "UTF-8";
+	public int defaultLength = 10000000;
 	
 	public HttpRequest() {
 		
@@ -57,32 +42,29 @@ class HttpRequest {
 		cookies.add(0, startCookie);
 	}
 	
-	public String GET(String url) {
-		return req(url, "GET", null, defaultEncoding, 0);
-	}
-	public String GET(String url, String responseEncoding) {
-		return req(url, "GET", null, responseEncoding, 0);
-	}
-	public String GET(String url, String responseEncoding, int responseLength) {
-		return req(url, "GET", null, responseEncoding, responseLength);
+	
+	/** 
+	 * Send GET request. 
+	 * @param url - URL for sending req. 
+	 * @return Server response as byte array.
+	 */
+	public byte[] GET(String url) {
+		return req(url, "GET", null);
 	}
 	
-	public String POST(String url, Map<String, Object> postData) {
-		return req(url, "POST", postData, defaultEncoding, 0);
-	}
-	public String POST(String url, Map<String, Object> postData, String responseEncoding) {
-		return req(url, "POST", postData, responseEncoding, 0);
-	}
-	public String POST(String url, Map<String, Object> postData, String responseEncoding, int responseLength) {
-		return req(url, "POST", postData, responseEncoding, responseLength);
+	/**
+	 * Send POST request. 
+	 * @param url - url for sending request. 
+	 * @param postData - POST data assoc array. 
+	 * @return Server response as byte array. 
+	 */
+	public byte[] POST(String url, Map<String, Object> postData) {
+		return req(url, "POST", postData);
 	}
 	
-	private String req(String url, String method, Map<String, Object> postData, String responseEncoding, int responseLength) {
-		String res = null;
-		
-		if (responseEncoding == null) {
-			responseEncoding = defaultEncoding;
-		}
+	
+	private byte[] req(String url, String method, Map<String, Object> postData) {
+		byte[] res = null;
 		
 		HttpURLConnection conn = openConnection(url, method, null);
 		if (conn != null) {
@@ -142,32 +124,33 @@ class HttpRequest {
 						in = conn.getInputStream();
 					}
 					
-					InputStreamReader reader = new InputStreamReader(in, responseEncoding);
-					String resD;
-					if (responseLength < 1) {
-						StringBuilder buffer = new StringBuilder();
-						int c;
-						while ((c = reader.read()) != -1) {
-							buffer.append((char) c);
-						}
-						resD = buffer.toString();
+					/* 
+					 * Read response as bytes array
+					 */
+					ByteArrayOutputStream out = new ByteArrayOutputStream();
+					int Len = 0;
+					int len = 0;
+					byte[] resB = new byte[10000];
+					
+					while (in.available() != 0) {
+						try {
+							len = in.read(resB);
+							out.write(resB, 0, len);
+							Len += len;
+							//System.out.println("readen: " + len);
+						} catch(Exception e4) {}
 					}
-					else {
-						/*Its work faster */
-						char[] buffer = new char[responseLength];
-						int len = reader.read(buffer);
-						resD = new String(buffer, 0, len);
-					}
+					out.flush();
+					
+					res = out.toByteArray();
 					
 					if (COOKIES) getCookieHeader(conn);
 					
-					res = resD;
-					
-					try {
-						reader.close();
-					} catch(IOException e3) {}
 					try {
 						in.close();
+					} catch(IOException e3) {}
+					try {
+						out.close();
 					} catch(IOException e3) {}
 					try {
 						dataOS.close();
@@ -250,7 +233,6 @@ class HttpRequest {
 		
 		if (file.isFile() && file.canRead()) {
 			InputStream inputStream = null;
-			ByteArrayOutputStream output = null;
 			try {
 				int length = (int) file.length();
 				inputStream = new FileInputStream(file);
@@ -299,6 +281,9 @@ class HttpRequest {
 		conn.setRequestProperty("Cookie", cookie);
 	}
 	
+	/**
+	 * Create new http connection.
+	 */
 	public HttpURLConnection openConnection(String address, String method, String cookies) {
 		HttpURLConnection res = null;
 		
