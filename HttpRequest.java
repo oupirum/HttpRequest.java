@@ -130,7 +130,7 @@ class HttpRequest {
 					ByteArrayOutputStream out = new ByteArrayOutputStream();
 					int Len = 0;
 					int len = 0;
-					byte[] resB = new byte[10000];
+					byte[] resB = new byte[100];
 					
 					while (in.available() != 0) {
 						try {
