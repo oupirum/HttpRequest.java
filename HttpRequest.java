@@ -130,14 +130,13 @@ class HttpRequest {
 					ByteArrayOutputStream out = new ByteArrayOutputStream();
 					int Len = 0;
 					int len = 0;
-					byte[] resB = new byte[100];
+					byte[] resB = new byte[1000];
 					
-					while (in.available() != 0) {
+					while ((len = in.read(resB)) >= 0) {
 						try {
-							len = in.read(resB);
 							out.write(resB, 0, len);
 							Len += len;
-							//System.out.println("readen: " + len);
+							//Log.d("HTTP", "readen: " + Len + " " + len);
 						} catch(Exception e4) {}
 					}
 					out.flush();
