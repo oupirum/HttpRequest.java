@@ -1,4 +1,4 @@
-package test;
+package pro.elandis.client;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -16,47 +16,57 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.util.Log;
+
 
 /** 
- * Sending GET & POST requests. JavaSE/Android. 
+ * Sending GET & POST requests in Android. 
  * 
- * @author Constantine Oupirum
- * version 1.2, 01.09.14
- * */
+ * version 1.2.2, 28.11.14
+ * 
+ * MIT license:	https://googledrive.com/host/0B2JzwD3Qc8A8QkZHMktnaExiaTg
+ */
 class HttpRequest {
 	public boolean COOKIES = true;
-	private ArrayList<String> cookies = new ArrayList<String>(5);
+	
+	private int cookiesAmount = 5;
+	private ArrayList<String> cookies = new ArrayList<String>(cookiesAmount);
 	
 	public String defaultEncoding = "UTF-8";
 	public int defaultLength = 10000000;
+	
+	public int status = 0;
 	
 	public HttpRequest() {
 		
 	}
 	public HttpRequest(boolean cookies) {
-		//Disable cookie: 
+		//Disable cookie:
 		COOKIES = cookies;
 	}
-	public HttpRequest(String startCookie) {
-		//Set start cookie: 
-		cookies.add(0, startCookie);
+	public HttpRequest(String[] startCookies) {
+		COOKIES = true;
+		setCurrentCookie(startCookies);
 	}
 	
 	
 	/** 
-	 * Send GET request. 
-	 * @param url - URL for sending req. 
-	 * @return Server response as byte array.
+	 * Send GET request
+	 * @param url - URL for sending Req
+	 * @return Server response as byte array
 	 */
 	public byte[] GET(String url) {
 		return req(url, "GET", null);
 	}
 	
 	/**
-	 * Send POST request. 
-	 * @param url - url for sending request. 
-	 * @param postData - POST data assoc array. 
-	 * @return Server response as byte array. 
+	 * Send POST request
+	 * @param url - url for sending request
+	 * @param postData - POST data assoc array
+	 * @return Server response as byte array
 	 */
 	public byte[] POST(String url, Map<String, Object> postData) {
 		return req(url, "POST", postData);
@@ -65,12 +75,17 @@ class HttpRequest {
 	
 	private byte[] req(String url, String method, Map<String, Object> postData) {
 		byte[] res = null;
+		this.status = 0;
 		
 		HttpURLConnection conn = openConnection(url, method, null);
 		if (conn != null) {
-			if (COOKIES) setCookieHeader(conn);
+			if (COOKIES) {
+				setCookieHeader(conn);
+			}
 			
-			/*POST form data: */
+			/*
+			 * POST form data
+			 */
 			FormData form = null;
 			if (postData != null) {
 				form = new FormData();
@@ -78,7 +93,9 @@ class HttpRequest {
 				for (String name: keys.keySet()) {
 					Object data = postData.get(name);
 					
-					/*File: */
+					/*
+					 * File
+					 */
 					try {
 						if (((File) postData.get(name)).isFile()) {
 							form.add(name, (File) data);
@@ -86,7 +103,9 @@ class HttpRequest {
 						}
 					} catch(Exception e4) {}
 					
-					/*Else if is string data: */
+					/*
+					 * Else if is string data
+					 */
 					try {
 						form.add(name, (String) data);
 					} catch(Exception e5) {}
@@ -107,17 +126,25 @@ class HttpRequest {
 					
 					InputStream in;
 					int status = conn.getResponseCode();
-					//Log.d("STATUS", status + " ");
+					this.status = status;
+					Log.d("HttpRequest > req()", "HTTP STATUS: " + status);
 					if (status >= 400) {
 						in = conn.getErrorStream();
 					}
-					/*Redirect: */
+					
+					/*
+					 * Redirect
+					 */
 					else {
-						if (status == HttpURLConnection.HTTP_MOVED_TEMP || status == HttpURLConnection.HTTP_MOVED_PERM || status == HttpURLConnection.HTTP_SEE_OTHER) {
+						if (status == HttpURLConnection.HTTP_MOVED_TEMP
+								|| status == HttpURLConnection.HTTP_MOVED_PERM
+								|| status == HttpURLConnection.HTTP_SEE_OTHER) {
 							String newUrl = conn.getHeaderField("Location");
-							String cookies = conn.getHeaderField("Set-Cookie");
+							//String cookies = conn.getHeaderField("Set-Cookie");
 							conn = openConnection(newUrl, method, null);
-							if (COOKIES) setCookieHeader(conn);
+							if (COOKIES) {
+								setCookieHeader(conn);
+							}
 							conn.connect();
 						}
 						
@@ -136,14 +163,18 @@ class HttpRequest {
 						try {
 							out.write(resB, 0, len);
 							Len += len;
-							//Log.d("HTTP", "readen: " + Len + " " + len);
-						} catch(Exception e4) {}
+							//Log.d("HttpRequest > req()", "bytes readen: " + Len + " " + len);
+						} catch(Exception e4) {
+							//Log.w("HttpRequest > req()", e4.getMessage() + "");
+						}
 					}
 					out.flush();
 					
 					res = out.toByteArray();
 					
-					if (COOKIES) getCookieHeader(conn);
+					if (COOKIES) {
+						getCookieHeader(conn);
+					}
 					
 					try {
 						in.close();
@@ -173,10 +204,15 @@ class HttpRequest {
 		private static final String boundary =  "*****kjdfsdoamdnaodfns*****";
 		private static final String crlf = "\r\n";
 		private String twoHyphens = "--";
-		private String postData = "Content-Type: multipart/form-data;boundary=" + FormData.boundary + crlf + crlf;
+		private String postData = "Content-Type: multipart/form-data;boundary="
+				+ FormData.boundary + crlf + crlf;
 		
 		public FormData() {
-			write(postData.getBytes(Charset.forName("UTF-8")));
+			try {
+				write(postData.getBytes("UTF-8"));
+			} catch (UnsupportedEncodingException e) {
+				e.printStackTrace();
+			}
 		}
 		
 		public byte[] getAsBytes() {
@@ -195,26 +231,40 @@ class HttpRequest {
 		
 		public void add(String name, String dataString) {
 			String data = twoHyphens + boundary + crlf;
-			data += "Content-Disposition: form-data; name=\"" + name + "\"" + crlf;
+			data += "Content-Disposition: form-data; name=\"" + name
+					+ "\"" + crlf;
 			data += crlf;
 			data += dataString;
 			data += crlf;
-			write(data.getBytes(Charset.forName("UTF-8")));
+			try {
+				write(data.getBytes("UTF-8"));
+			} catch (UnsupportedEncodingException e) {
+				e.printStackTrace();
+			}
 		}
 		
 		public void add(String name, File file) {
 			String data = twoHyphens + boundary + crlf;
-			data += "Content-Disposition: form-data; name=\"" + name + "\";filename=\"" + file.getName() + "\"" + crlf;
+			data += "Content-Disposition: form-data; name=\"" + name
+					+ "\";filename=\"" + file.getName() + "\"" + crlf;
 			data += "Content-Type: application/octet-stream" + crlf;
 			data += "Content-Length: " + file.length() + crlf;
 			data += crlf;
-			write(data.getBytes(Charset.forName("UTF-8")));
+			try {
+				write(data.getBytes("UTF-8"));
+			} catch (UnsupportedEncodingException e) {
+				e.printStackTrace();
+			}
 			
 			byte[] fileBytes = getFileBytes(file);
 			write(fileBytes);
 			
 			data = crlf;
-			write(data.getBytes(Charset.forName("UTF-8")));
+			try {
+				write(data.getBytes("UTF-8"));
+			} catch (UnsupportedEncodingException e) {
+				e.printStackTrace();
+			}
 		}
 		
 		private void write(byte[] bytesData) {
@@ -227,61 +277,52 @@ class HttpRequest {
 		}
 	}
 	
-	public static byte[] getFileBytes(File file) {
-		byte[] content = null;
-		
-		if (file.isFile() && file.canRead()) {
-			InputStream inputStream = null;
-			try {
-				int length = (int) file.length();
-				inputStream = new FileInputStream(file);
-				byte[] buffer = new byte[length];
-				int d = inputStream.read(buffer);
-				
-				content = buffer;
-			} catch(Exception e) {
-				//Log.e("getFileContent", e.getMessage() + "");
-			} finally {
-				try {
-					inputStream.close();
-				} catch (IOException e) {}
-			}
-		}
-		
-		return content;
-	}
 	
 	public String[] getCurrentCookies() {
-		return cookies.toArray(new String[5]);
+		return cookies.toArray(new String[cookiesAmount]);
 	}
+	
+	public void setCurrentCookie(String[] cookie) {
+		for (int i = 0; i < cookie.length; i++) {
+			if (i == cookiesAmount) {
+				break;
+			}
+			
+			saveCookie(cookie[i]);
+		}
+	}
+	
+	private void saveCookie(String cook) {
+		cookies.add(0, cook);
+		
+		if (cookies.size() > cookiesAmount) {
+			cookies.remove(cookiesAmount);
+		}
+	}
+	
 	private void getCookieHeader(HttpURLConnection conn) {
 		Map<String, List<String>> headers = conn.getHeaderFields();
-		//Log.d("Response cookie header", conn.getHeaderField("Set-Cookie") + " ");
 		List<String> cook = headers.get("Set-Cookie");
 		if (cook != null) {
 			for (String c: cook) {
 				if (cookies.indexOf(c) == -1) {
-					cookies.add(0, c);
-					
-					try {
-						cookies.remove(4);
-					} catch(Exception e) {}
+					saveCookie(c);
 				}
 			}
 		}
-		
 	}
+	
 	private void setCookieHeader(HttpURLConnection conn) {
 		String cookie = "";
-		for (Object cook: cookies) {
-			cookie += (String) cook + "; ";
+		for (String cook: cookies) {
+			cookie += cook + "; ";
 		}
-		//Log.d("Set request header", cookie + " ");
 		conn.setRequestProperty("Cookie", cookie);
 	}
 	
+	
 	/**
-	 * Create new http connection.
+	 * Create new http connection
 	 */
 	public HttpURLConnection openConnection(String address, String method, String cookies) {
 		HttpURLConnection res = null;
@@ -301,13 +342,17 @@ class HttpRequest {
 				conn.setRequestMethod(method);
 				conn.setRequestProperty("Connection", "keep-alive");
 				conn.setRequestProperty("Accept-Language", "ru,en-GB;q=0.8,en;q=0.6");
-				conn.setRequestProperty("Accept-Charset", "utf-8");
-				conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+				//conn.setRequestProperty("Accept-Charset", "utf-8");
+				conn.setRequestProperty("Accept", "text/html,application/xhtml+xml," 
+						+ "application/xml;q=0.9,image/webp,*/*;q=0.8");
+				//conn.setReadTimeout(3000);
+				conn.setConnectTimeout(10000);
 				if (cookies != null) {
 					conn.setRequestProperty("Cookie", cookies);
 				}
 				if (method.toLowerCase().equals("post")) {
-					conn.setRequestProperty("Content-Type", "multipart/form-data;boundary=" + FormData.boundary);
+					conn.setRequestProperty("Content-Type", "multipart/form-data;boundary="
+							+ FormData.boundary);
 					conn.setDoOutput(true);
 				}
 				conn.setDoInput(true);
@@ -320,6 +365,48 @@ class HttpRequest {
 		}
 		
 		return res;
+	}
+	
+	public static byte[] getFileBytes(File file) {
+		byte[] content = null;
+		
+		if (file.isFile() && file.canRead()) {
+			InputStream inputStream = null;
+			try {
+				int length = (int) file.length();
+				inputStream = new FileInputStream(file);
+				byte[] buffer = new byte[length];
+				int d = inputStream.read(buffer);
+				
+				content = buffer;
+			} catch(Exception e) {
+				//Log.w("HttpRequest > getFileBytes()", e.getMessage() + "");
+			} finally {
+				try {
+					inputStream.close();
+				} catch (IOException e) {}
+			}
+		}
+		
+		return content;
+	}
+	
+	
+	/**
+	 * Check Internet connection availibility on Android
+	 * @param act
+	 * @return
+	 */
+	public static boolean checkNetAcc(Context ctx) {
+		ConnectivityManager cm = (ConnectivityManager) ctx.getSystemService(
+				Context.CONNECTIVITY_SERVICE);
+		NetworkInfo ni = cm.getActiveNetworkInfo();
+		if (ni != null && ni.isConnected()) {
+			return true;
+		}
+		else {
+			return false;
+		}
 	}
 	
 }
