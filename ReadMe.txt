@@ -1,5 +1,5 @@
 
-Class for sending GET & POST requests in Java/Android
+Class for sending GET & POST requests by /Android
 
  * How to use: 
 String url = "http://site.net/huita.php";
