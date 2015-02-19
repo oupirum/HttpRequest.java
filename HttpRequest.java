@@ -1,4 +1,4 @@
-package pro.elandis.client;
+package pro.elandis.client.libs;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -10,9 +10,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -23,13 +21,14 @@ import android.util.Log;
 
 
 /** 
- * Sending GET & POST requests in Android. 
+ * Sending GET & POST requests in Android
  * 
- * version 1.2.2, 28.11.14
+ * @version 1.2.3, 10.02.15 <br/>
  * 
+ * @author Constantine Oupirum <br/>
  * MIT license:	https://googledrive.com/host/0B2JzwD3Qc8A8QkZHMktnaExiaTg
  */
-class HttpRequest {
+public class HttpRequest {
 	public boolean COOKIES = true;
 	
 	private int cookiesAmount = 5;
@@ -40,20 +39,21 @@ class HttpRequest {
 	
 	public int status = 0;
 	
+	
 	public HttpRequest() {
-		
 	}
-	public HttpRequest(boolean cookies) {
-		//Disable cookie:
-		COOKIES = cookies;
+	
+	public HttpRequest(boolean cookiesEnabled) {
+		COOKIES = cookiesEnabled;
 	}
+	
 	public HttpRequest(String[] startCookies) {
 		COOKIES = true;
 		setCurrentCookie(startCookies);
 	}
 	
 	
-	/** 
+	/**
 	 * Send GET request
 	 * @param url - URL for sending Req
 	 * @return Server response as byte array
@@ -64,8 +64,8 @@ class HttpRequest {
 	
 	/**
 	 * Send POST request
-	 * @param url - url for sending request
-	 * @param postData - POST data assoc array
+	 * @param url - url to send request
+	 * @param postData - POST data Map
 	 * @return Server response as byte array
 	 */
 	public byte[] POST(String url, Map<String, Object> postData) {
@@ -77,126 +77,174 @@ class HttpRequest {
 		byte[] res = null;
 		this.status = 0;
 		
-		HttpURLConnection conn = openConnection(url, method, null);
-		if (conn != null) {
-			if (COOKIES) {
-				setCookieHeader(conn);
+		HttpURLConnection conn = null;
+		try {
+			conn = openConnection(url, method, null);
+		} catch(Exception e) {
+			Log.e("HttpRequest.req()", "could not open connection");
+			e.printStackTrace();
+			return null;
+		}
+		
+		if (COOKIES) {
+			setCookieHeader(conn);
+		}
+		
+		/*
+		 * POST form data
+		 */
+		FormData form = null;
+		if (postData != null) {
+			form = new FormData();
+			Map <String, Object> keys = postData;
+			for (String name: keys.keySet()) {
+				Object data = postData.get(name);
+				
+				boolean isStr = (data instanceof String);
+				boolean isFile = (data instanceof File);
+				Log.d("HttpRequest.req()",
+						"type of " + name + ": " + (isStr ? "String" : (isFile ? "File" : "��") ));
+				if (isStr) {
+					form.add(name, (String) data);
+				}
+				else if (isFile) {
+					form.add(name, (File) data);
+				}
 			}
+		}
+		
+		try {
+			conn.connect();
+		} catch(IOException e) {
+			Log.w("HttpRequest.req()", "could not connect");
+			e.printStackTrace();
+			return null;
+		}
 			
-			/*
-			 * POST form data
-			 */
-			FormData form = null;
-			if (postData != null) {
-				form = new FormData();
-				Map <String, Object> keys = postData;
-				for (String name: keys.keySet()) {
-					Object data = postData.get(name);
-					
-					/*
-					 * File
-					 */
-					try {
-						if (((File) postData.get(name)).isFile()) {
-							form.add(name, (File) data);
-							continue;
-						}
-					} catch(Exception e4) {}
-					
-					/*
-					 * Else if is string data
-					 */
-					try {
-						form.add(name, (String) data);
-					} catch(Exception e5) {}
+		if (postData != null) {
+			DataOutputStream dataOS = null;
+			try {
+				dataOS = new DataOutputStream(conn.getOutputStream());
+				byte[] b = form.getAsBytes();
+				dataOS.write(b);
+				dataOS.flush();
+			} catch(IOException e) {
+				Log.e("HttpRequest.req()", "could not write POST data to output stream");
+				e.printStackTrace();
+				try {
+					dataOS.close();
+				} catch(Exception e3) {
+					//
+				}
+			}
+		}
+		
+		int status = 0;
+		try {
+			status = conn.getResponseCode();
+		} catch(IOException e) {
+			Log.w("HttpRequest.req()", "could not get response code");
+			e.printStackTrace();
+			return null;
+		}
+		this.status = status;
+		Log.d("HttpRequest.req()", "HTTP STATUS: " + status);
+		
+		InputStream in;
+		
+		/*
+		 * Some http error
+		 */
+		if (status >= 400) {
+			in = conn.getErrorStream();
+		}
+		else {
+			boolean isRedirect = ( (status == HttpURLConnection.HTTP_MOVED_TEMP)
+					|| (status == HttpURLConnection.HTTP_MOVED_PERM)
+					|| (status == HttpURLConnection.HTTP_SEE_OTHER) );
+			if (isRedirect) {
+				String newUrl = conn.getHeaderField("Location");
+				//String cookies = conn.getHeaderField("Set-Cookie");
+				
+				try {
+					conn = openConnection(newUrl, method, null);
+				} catch(Exception e) {
+					Log.e("HttpRequest.req()", "could not open connection after redirect");
+					e.printStackTrace();
+					return null;
+				}
+				
+				if (COOKIES) {
+					setCookieHeader(conn);
+				}
+				
+				try {
+					conn.connect();
+				} catch(IOException e) {
+					Log.w("HttpRequest.req()", "could not connect after redirect");
+					e.printStackTrace();
+					return null;
 				}
 			}
 			
 			try {
-				conn.connect();
-				
-				DataOutputStream dataOS = null;
-				try {
-					if (postData != null) {
-						dataOS = new DataOutputStream(conn.getOutputStream());
-						byte[] b = form.getAsBytes();
-						dataOS.write(b);
-						dataOS.flush();
-					}
-					
-					InputStream in;
-					int status = conn.getResponseCode();
-					this.status = status;
-					Log.d("HttpRequest > req()", "HTTP STATUS: " + status);
-					if (status >= 400) {
-						in = conn.getErrorStream();
-					}
-					
-					/*
-					 * Redirect
-					 */
-					else {
-						if (status == HttpURLConnection.HTTP_MOVED_TEMP
-								|| status == HttpURLConnection.HTTP_MOVED_PERM
-								|| status == HttpURLConnection.HTTP_SEE_OTHER) {
-							String newUrl = conn.getHeaderField("Location");
-							//String cookies = conn.getHeaderField("Set-Cookie");
-							conn = openConnection(newUrl, method, null);
-							if (COOKIES) {
-								setCookieHeader(conn);
-							}
-							conn.connect();
-						}
-						
-						in = conn.getInputStream();
-					}
-					
-					/* 
-					 * Read response as bytes array
-					 */
-					ByteArrayOutputStream out = new ByteArrayOutputStream();
-					int Len = 0;
-					int len = 0;
-					byte[] resB = new byte[1000];
-					
-					while ((len = in.read(resB)) >= 0) {
-						try {
-							out.write(resB, 0, len);
-							Len += len;
-							//Log.d("HttpRequest > req()", "bytes readen: " + Len + " " + len);
-						} catch(Exception e4) {
-							//Log.w("HttpRequest > req()", e4.getMessage() + "");
-						}
-					}
-					out.flush();
-					
-					res = out.toByteArray();
-					
-					if (COOKIES) {
-						getCookieHeader(conn);
-					}
-					
-					try {
-						in.close();
-					} catch(IOException e3) {}
-					try {
-						out.close();
-					} catch(IOException e3) {}
-					try {
-						dataOS.close();
-					} catch(Exception e3) {}
-				} catch (UnsupportedEncodingException e1) {
-					e1.printStackTrace();
-				} catch (IOException e2) {
-					e2.printStackTrace();
-				}
-			} catch (IOException e) {
-				e.printStackTrace();
+				in = conn.getInputStream();
+			} catch(IOException e) {
+				Log.e("HttpRequest.req()", "could not get input stream");
+				return null;
 			}
+			
+			try {
+				res = readResp(in);
+			} catch(IOException e) {
+				Log.e("HttpRequest.req()", "could not read response");
+				e.printStackTrace();
+				return null;
+			}
+			
+			if (COOKIES) {
+				getCookieHeader(conn);
+			}
+		}
+		
+		try {
+			in.close();
+		} catch(IOException e3) {
+			//
 		}
 		
 		return res;
 	}
+	
+	private byte[] readResp(InputStream in) throws IOException {
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		int Len = 0;
+		int len = 0;
+		byte[] resB = new byte[1000];
+		
+		while ((len = in.read(resB)) >= 0) {
+			try {
+				out.write(resB, 0, len);
+				Len += len;
+				//Log.d("HttpRequest > req()", "bytes readen: " + Len + " " + len);
+			} catch(Exception e4) {
+				//Log.w("HttpRequest > req()", e4.getMessage() + "");
+			}
+		}
+		
+		out.flush();
+		
+		byte[] arr = out.toByteArray();
+		
+		try {
+			out.close();
+		} catch(IOException e) {
+			//e.printStackTrace();
+		}
+		
+		return arr;
+	}
+	
 	
 	private class FormData {
 		private ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -323,49 +371,37 @@ class HttpRequest {
 	
 	/**
 	 * Create new http connection
+	 * @throws IOException 
 	 */
-	public HttpURLConnection openConnection(String address, String method, String cookies) {
-		HttpURLConnection res = null;
+	public HttpURLConnection openConnection(String address, String method, String cookies)
+			throws IOException, MalformedURLException {
+		HttpURLConnection conn = null;
 		
-		URL url = null;
-		try {
-			url = new URL(address);
-		} catch (MalformedURLException e) {
-			e.printStackTrace();
+		URL url = new URL(address);
+		
+		conn = (HttpURLConnection) url.openConnection();
+		conn.setRequestMethod(method);
+		conn.setRequestProperty("Connection", "keep-alive");
+		conn.setRequestProperty("Accept-Language", "ru,en-GB;q=0.8,en;q=0.6");
+		//conn.setRequestProperty("Accept-Charset", "utf-8");
+		conn.setRequestProperty("Accept", "text/html,application/xhtml+xml," 
+				+ "application/xml;q=0.9,image/webp,*/*;q=0.8");
+		//conn.setReadTimeout(3000);
+		conn.setConnectTimeout(10000);
+		if (cookies != null) {
+			conn.setRequestProperty("Cookie", cookies);
 		}
-		
-		if (url != null) {
-			HttpURLConnection conn = null;
-			try {
-				conn = (HttpURLConnection) url.openConnection();
-				
-				conn.setRequestMethod(method);
-				conn.setRequestProperty("Connection", "keep-alive");
-				conn.setRequestProperty("Accept-Language", "ru,en-GB;q=0.8,en;q=0.6");
-				//conn.setRequestProperty("Accept-Charset", "utf-8");
-				conn.setRequestProperty("Accept", "text/html,application/xhtml+xml," 
-						+ "application/xml;q=0.9,image/webp,*/*;q=0.8");
-				//conn.setReadTimeout(3000);
-				conn.setConnectTimeout(10000);
-				if (cookies != null) {
-					conn.setRequestProperty("Cookie", cookies);
-				}
-				if (method.toLowerCase().equals("post")) {
-					conn.setRequestProperty("Content-Type", "multipart/form-data;boundary="
-							+ FormData.boundary);
-					conn.setDoOutput(true);
-				}
-				conn.setDoInput(true);
-				conn.setInstanceFollowRedirects(true);
-				
-				res = conn;
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+		if (method.toLowerCase().equals("post")) {
+			conn.setRequestProperty("Content-Type", "multipart/form-data;boundary="
+					+ FormData.boundary);
+			conn.setDoOutput(true);
 		}
+		conn.setDoInput(true);
+		conn.setInstanceFollowRedirects(true);
 		
-		return res;
+		return conn;
 	}
+	
 	
 	public static byte[] getFileBytes(File file) {
 		byte[] content = null;
@@ -393,9 +429,9 @@ class HttpRequest {
 	
 	
 	/**
-	 * Check Internet connection availibility on Android
+	 * Check Internet connection availibility
 	 * @param act
-	 * @return
+	 * @return bool
 	 */
 	public static boolean checkNetAcc(Context ctx) {
 		ConnectivityManager cm = (ConnectivityManager) ctx.getSystemService(
@@ -404,9 +440,8 @@ class HttpRequest {
 		if (ni != null && ni.isConnected()) {
 			return true;
 		}
-		else {
-			return false;
-		}
+		
+		return false;
 	}
 	
 }
