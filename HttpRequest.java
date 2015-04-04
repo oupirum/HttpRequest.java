@@ -1,4 +1,4 @@
-package pro.elandis.client.libs;
+package net.co.io;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -14,16 +14,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import android.content.Context;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
-import android.util.Log;
-
 
 /** 
  * Sending GET & POST requests in Android
  * 
- * @version 1.2.3, 10.02.15 <br/>
+ * @version 1.2.4 <br/>
+ * Last upd: 31.03.15 <br/>
  * 
  * @author Constantine Oupirum <br/>
  * MIT license:	https://googledrive.com/host/0B2JzwD3Qc8A8QkZHMktnaExiaTg
@@ -34,11 +30,7 @@ public class HttpRequest {
 	private int cookiesAmount = 5;
 	private ArrayList<String> cookies = new ArrayList<String>(cookiesAmount);
 	
-	public String defaultEncoding = "UTF-8";
-	public int defaultLength = 10000000;
-	
 	public int status = 0;
-	
 	
 	public HttpRequest() {
 	}
@@ -51,7 +43,6 @@ public class HttpRequest {
 		COOKIES = true;
 		setCurrentCookie(startCookies);
 	}
-	
 	
 	/**
 	 * Send GET request
@@ -72,7 +63,6 @@ public class HttpRequest {
 		return req(url, "POST", postData);
 	}
 	
-	
 	private byte[] req(String url, String method, Map<String, Object> postData) {
 		byte[] res = null;
 		this.status = 0;
@@ -80,8 +70,8 @@ public class HttpRequest {
 		HttpURLConnection conn = null;
 		try {
 			conn = openConnection(url, method, null);
-		} catch(Exception e) {
-			Log.e("HttpRequest.req()", "could not open connection");
+		} catch (Exception e) {
+			System.out.println("HttpRequest.req(), could not open connection");
 			e.printStackTrace();
 			return null;
 		}
@@ -96,31 +86,30 @@ public class HttpRequest {
 		FormData form = null;
 		if (postData != null) {
 			form = new FormData();
-			Map <String, Object> keys = postData;
-			for (String name: keys.keySet()) {
+			Map<String, Object> keys = postData;
+			for (String name : keys.keySet()) {
 				Object data = postData.get(name);
 				
-				boolean isStr = (data instanceof String);
-				boolean isFile = (data instanceof File);
-				Log.d("HttpRequest.req()",
-						"type of " + name + ": " + (isStr ? "String" : (isFile ? "File" : "��") ));
-				if (isStr) {
-					form.add(name, (String) data);
+				if (data instanceof String) {
+					form.addString(name, (String) data);
 				}
-				else if (isFile) {
-					form.add(name, (File) data);
+				else if (data instanceof File) {
+					form.addFile(name, (File) data);
+				}
+				else {
+					form.addString(name, data.toString());
 				}
 			}
 		}
 		
 		try {
 			conn.connect();
-		} catch(IOException e) {
-			Log.w("HttpRequest.req()", "could not connect");
+		} catch (IOException e) {
+			System.out.println("HttpRequest.req(), could not connect");
 			e.printStackTrace();
 			return null;
 		}
-			
+		
 		if (postData != null) {
 			DataOutputStream dataOS = null;
 			try {
@@ -128,27 +117,26 @@ public class HttpRequest {
 				byte[] b = form.getAsBytes();
 				dataOS.write(b);
 				dataOS.flush();
-			} catch(IOException e) {
-				Log.e("HttpRequest.req()", "could not write POST data to output stream");
+				
+				dataOS.close();
+			} catch (IOException e) {
+				System.out.println(
+						"HttpRequest.req(), could not write POST data to output stream");
 				e.printStackTrace();
-				try {
-					dataOS.close();
-				} catch(Exception e3) {
-					//
-				}
 			}
 		}
 		
 		int status = 0;
 		try {
 			status = conn.getResponseCode();
-		} catch(IOException e) {
-			Log.w("HttpRequest.req()", "could not get response code");
+		} catch (IOException e) {
+			System.out.println(
+					"HttpRequest.req(), could not get response code");
 			e.printStackTrace();
 			return null;
 		}
 		this.status = status;
-		Log.d("HttpRequest.req()", "HTTP STATUS: " + status);
+		System.out.println("HttpRequest.req(), HTTP STATUS: " + status);
 		
 		InputStream in;
 		
@@ -159,17 +147,16 @@ public class HttpRequest {
 			in = conn.getErrorStream();
 		}
 		else {
-			boolean isRedirect = ( (status == HttpURLConnection.HTTP_MOVED_TEMP)
-					|| (status == HttpURLConnection.HTTP_MOVED_PERM)
-					|| (status == HttpURLConnection.HTTP_SEE_OTHER) );
+			boolean isRedirect = ((status == HttpURLConnection.HTTP_MOVED_TEMP) ||
+					(status == HttpURLConnection.HTTP_MOVED_PERM) || 
+					(status == HttpURLConnection.HTTP_SEE_OTHER));
 			if (isRedirect) {
 				String newUrl = conn.getHeaderField("Location");
-				//String cookies = conn.getHeaderField("Set-Cookie");
-				
 				try {
 					conn = openConnection(newUrl, method, null);
-				} catch(Exception e) {
-					Log.e("HttpRequest.req()", "could not open connection after redirect");
+				} catch (Exception e) {
+					System.out.println(
+							"HttpRequest.req(), could not open connection after redirect");
 					e.printStackTrace();
 					return null;
 				}
@@ -180,8 +167,9 @@ public class HttpRequest {
 				
 				try {
 					conn.connect();
-				} catch(IOException e) {
-					Log.w("HttpRequest.req()", "could not connect after redirect");
+				} catch (IOException e) {
+					System.out.println(
+							"HttpRequest.req(), could not connect after redirect");
 					e.printStackTrace();
 					return null;
 				}
@@ -189,15 +177,23 @@ public class HttpRequest {
 			
 			try {
 				in = conn.getInputStream();
-			} catch(IOException e) {
-				Log.e("HttpRequest.req()", "could not get input stream");
+			} catch (IOException e) {
+				System.out.println(
+						"HttpRequest.req(), could not get input stream");
+				e.printStackTrace();
+				return null;
+			} catch (Exception e2) {
+				System.out.println(
+						"HttpRequest.req(), could not get input stream");
+				e2.printStackTrace();
 				return null;
 			}
 			
 			try {
 				res = readResp(in);
-			} catch(IOException e) {
-				Log.e("HttpRequest.req()", "could not read response");
+			} catch (IOException e) {
+				System.out.println(
+						"HttpRequest.req(), could not read response");
 				e.printStackTrace();
 				return null;
 			}
@@ -209,8 +205,7 @@ public class HttpRequest {
 		
 		try {
 			in.close();
-		} catch(IOException e3) {
-			//
+		} catch (IOException e3) {
 		}
 		
 		return res;
@@ -223,13 +218,10 @@ public class HttpRequest {
 		byte[] resB = new byte[1000];
 		
 		while ((len = in.read(resB)) >= 0) {
-			try {
-				out.write(resB, 0, len);
-				Len += len;
-				//Log.d("HttpRequest > req()", "bytes readen: " + Len + " " + len);
-			} catch(Exception e4) {
-				//Log.w("HttpRequest > req()", e4.getMessage() + "");
-			}
+			out.write(resB, 0, len);
+			Len += len;
+			//System.out.println("HttpRequest > req(), bytes readen: " + Len +
+			//		" " + len);
 		}
 		
 		out.flush();
@@ -238,7 +230,7 @@ public class HttpRequest {
 		
 		try {
 			out.close();
-		} catch(IOException e) {
+		} catch (IOException e) {
 			//e.printStackTrace();
 		}
 		
@@ -246,14 +238,16 @@ public class HttpRequest {
 	}
 	
 	
+	
 	private class FormData {
 		private ByteArrayOutputStream bytes = new ByteArrayOutputStream();
 		
-		private static final String boundary =  "*****kjdfsdoamdnaodfns*****";
+		private static final String boundary = "*****kjdfsdoamdnaodfns*****";
 		private static final String crlf = "\r\n";
-		private String twoHyphens = "--";
-		private String postData = "Content-Type: multipart/form-data;boundary="
-				+ FormData.boundary + crlf + crlf;
+		private static final String twoHyphens = "--";
+		
+		private String postData = "Content-Type: multipart/form-data;boundary=" +
+				boundary + crlf + crlf;
 		
 		public FormData() {
 			try {
@@ -277,10 +271,10 @@ public class HttpRequest {
 			return b;
 		}
 		
-		public void add(String name, String dataString) {
+		public void addString(String name, String dataString) {
 			String data = twoHyphens + boundary + crlf;
-			data += "Content-Disposition: form-data; name=\"" + name
-					+ "\"" + crlf;
+			data += "Content-Disposition: form-data; name=\"" + name + "\"" +
+					crlf;
 			data += crlf;
 			data += dataString;
 			data += crlf;
@@ -291,10 +285,10 @@ public class HttpRequest {
 			}
 		}
 		
-		public void add(String name, File file) {
+		public void addFile(String name, File file) {
 			String data = twoHyphens + boundary + crlf;
-			data += "Content-Disposition: form-data; name=\"" + name
-					+ "\";filename=\"" + file.getName() + "\"" + crlf;
+			data += "Content-Disposition: form-data; name=\"" + name +
+					"\";filename=\"" + file.getName() + "\"" + crlf;
 			data += "Content-Type: application/octet-stream" + crlf;
 			data += "Content-Length: " + file.length() + crlf;
 			data += crlf;
@@ -318,13 +312,11 @@ public class HttpRequest {
 		private void write(byte[] bytesData) {
 			try {
 				bytes.write(bytesData);
-				//System.out.println(bytesData.length + " writed");
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
 	}
-	
 	
 	public String[] getCurrentCookies() {
 		return cookies.toArray(new String[cookiesAmount]);
@@ -352,7 +344,7 @@ public class HttpRequest {
 		Map<String, List<String>> headers = conn.getHeaderFields();
 		List<String> cook = headers.get("Set-Cookie");
 		if (cook != null) {
-			for (String c: cook) {
+			for (String c : cook) {
 				if (cookies.indexOf(c) == -1) {
 					saveCookie(c);
 				}
@@ -362,19 +354,19 @@ public class HttpRequest {
 	
 	private void setCookieHeader(HttpURLConnection conn) {
 		String cookie = "";
-		for (String cook: cookies) {
+		for (String cook : cookies) {
 			cookie += cook + "; ";
 		}
 		conn.setRequestProperty("Cookie", cookie);
 	}
 	
-	
 	/**
 	 * Create new http connection
-	 * @throws IOException 
+	 * @throws IOException
+	 * @throws MalformedURLException
 	 */
-	public HttpURLConnection openConnection(String address, String method, String cookies)
-			throws IOException, MalformedURLException {
+	public HttpURLConnection openConnection(String address, String method,
+			String cookies) throws IOException, MalformedURLException {
 		HttpURLConnection conn = null;
 		
 		URL url = new URL(address);
@@ -384,16 +376,16 @@ public class HttpRequest {
 		conn.setRequestProperty("Connection", "keep-alive");
 		conn.setRequestProperty("Accept-Language", "ru,en-GB;q=0.8,en;q=0.6");
 		//conn.setRequestProperty("Accept-Charset", "utf-8");
-		conn.setRequestProperty("Accept", "text/html,application/xhtml+xml," 
+		conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,"
 				+ "application/xml;q=0.9,image/webp,*/*;q=0.8");
-		//conn.setReadTimeout(3000);
+		//conn.setReadTimeout(10000);
 		conn.setConnectTimeout(10000);
 		if (cookies != null) {
 			conn.setRequestProperty("Cookie", cookies);
 		}
 		if (method.toLowerCase().equals("post")) {
-			conn.setRequestProperty("Content-Type", "multipart/form-data;boundary="
-					+ FormData.boundary);
+			conn.setRequestProperty("Content-Type",
+					"multipart/form-data;boundary=" + FormData.boundary);
 			conn.setDoOutput(true);
 		}
 		conn.setDoInput(true);
@@ -402,48 +394,29 @@ public class HttpRequest {
 		return conn;
 	}
 	
-	
 	public static byte[] getFileBytes(File file) {
 		byte[] content = null;
 		
 		if (file.isFile() && file.canRead()) {
 			InputStream inputStream = null;
+			int length = (int) file.length();
 			try {
-				int length = (int) file.length();
 				inputStream = new FileInputStream(file);
 				byte[] buffer = new byte[length];
-				int d = inputStream.read(buffer);
+				inputStream.read(buffer);
 				
 				content = buffer;
-			} catch(Exception e) {
-				//Log.w("HttpRequest > getFileBytes()", e.getMessage() + "");
+			} catch (Exception e) {
+				//System.out.println("HttpRequest > getFileBytes(), " +
+				//		e.getMessage());
 			} finally {
 				try {
 					inputStream.close();
-				} catch (IOException e) {}
+				} catch (IOException e) {
+				}
 			}
 		}
 		
 		return content;
 	}
-	
-	
-	/**
-	 * Check Internet connection availibility
-	 * @param act
-	 * @return bool
-	 */
-	public static boolean checkNetAcc(Context ctx) {
-		ConnectivityManager cm = (ConnectivityManager) ctx.getSystemService(
-				Context.CONNECTIVITY_SERVICE);
-		NetworkInfo ni = cm.getActiveNetworkInfo();
-		if (ni != null && ni.isConnected()) {
-			return true;
-		}
-		
-		return false;
-	}
-	
 }
-
-
