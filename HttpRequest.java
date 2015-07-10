@@ -10,25 +10,25 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
 
-/** 
- * Sending GET & POST requests in Android
+/**
+ * Sending GET & POST requests
  * 
- * @version 1.2.4 <br/>
- * Last upd: 27.05.15 <br/>
+ * @version 1.2.5 <br/>
+ * Last upd: 10.07.15 <br/>
  * 
  * @author Constantine Oupirum <br/>
- * MIT license:	https://googledrive.com/host/0B2JzwD3Qc8A8QkZHMktnaExiaTg
  */
 public class HttpRequest {
 	private boolean cookies = true;
 	private int cookiesAmount = 5;
 	private ArrayList<String> cookiesList = new ArrayList<String>(cookiesAmount);
 	
-	public int status = 0;
+	public int lastStatus = 0;
 	
 	public HttpRequest() {
 	}
@@ -46,30 +46,56 @@ public class HttpRequest {
 	/**
 	 * Send GET request
 	 * @param url - URL for sending Req
-	 * @return Server response as byte array
+	 * @return response as byte array
 	 * @throws IOException 
 	 */
 	public byte[] GET(String url) throws IOException {
-		return req(url, "GET", null);
+		return req(url, "GET", null, null);
+	}
+	
+	/**
+	 * Send GET request with basic authentication
+	 * @param url
+	 * @param auth - credentials string like "login:password"
+	 * @return response as byte array
+	 * @throws IOException
+	 */
+	public byte[] GET(String url, String auth) throws IOException {
+		return req(url, "GET", null, auth);
 	}
 	
 	/**
 	 * Send POST request
 	 * @param url - url to send request
 	 * @param postData - POST data Map
-	 * @return Server response as byte array
+	 * @return response as byte array
 	 * @throws IOException 
 	 */
-	public byte[] POST(String url, Map<String, Object> postData) throws IOException {
-		return req(url, "POST", postData);
+	public byte[] POST(String url, Map<String, Object> postData) 
+			throws IOException {
+		return req(url, "POST", postData, null);
+	}
+	
+	/**
+	 * Send POST request with basic authentication
+	 * @param url
+	 * @param postData
+	 * @param auth - credentials string like "login:password"
+	 * @return
+	 * @throws IOException
+	 */
+	public byte[] POST(String url, Map<String, Object> postData, String auth) 
+			throws IOException {
+		return req(url, "POST", postData, auth);
 	}
 	
 	
-	private byte[] req(String url, String method, Map<String, Object> postData) throws IOException {
+	private byte[] req(String url, String method, Map<String, Object> postData, 
+			String auth) throws IOException {
 		byte[] res = null;
-		this.status = 0;
+		this.lastStatus = 0;
 		
-		HttpURLConnection conn = openConnection(url, method, null);
+		HttpURLConnection conn = openConnection(url, method, null, auth);
 		if (cookies) {
 			setRequestCookie(conn);
 		}
@@ -102,20 +128,20 @@ public class HttpRequest {
 			}
 		}
 		
-		status = conn.getResponseCode();
-		System.out.println("HttpRequest.req(), http status: " + status);
+		lastStatus = conn.getResponseCode();
+		System.out.println("HttpRequest.req(), http status: " + lastStatus);
 		
 		InputStream in = null;
-		if (status >= 400) {
+		if (lastStatus >= 400) {
 			in = conn.getErrorStream();
 		}
 		else {
-			boolean isRedirect = ((status == HttpURLConnection.HTTP_MOVED_TEMP) ||
-					(status == HttpURLConnection.HTTP_MOVED_PERM) || 
-					(status == HttpURLConnection.HTTP_SEE_OTHER));
+			boolean isRedirect = ((lastStatus == HttpURLConnection.HTTP_MOVED_TEMP) ||
+					(lastStatus == HttpURLConnection.HTTP_MOVED_PERM) || 
+					(lastStatus == HttpURLConnection.HTTP_SEE_OTHER));
 			if (isRedirect) {
 				String newUrl = conn.getHeaderField("Location");
-				conn = openConnection(newUrl, method, null);
+				conn = openConnection(newUrl, method, null, auth);
 				if (cookies) {
 					setRequestCookie(conn);
 				}
@@ -278,19 +304,23 @@ public class HttpRequest {
 	 * @throws MalformedURLException
 	 */
 	public HttpURLConnection openConnection(String address, String method,
-			String cookies) throws IOException, MalformedURLException {
+			String cookies, String auth) throws IOException, MalformedURLException {
 		HttpURLConnection conn = null;
 		
 		URL url = new URL(address);
 		
 		conn = (HttpURLConnection) url.openConnection();
 		conn.setRequestMethod(method);
+		
+		if (auth != null) {
+			String basicAuth = "Basic " + b64Encode(auth);
+			conn.setRequestProperty ("Authorization", basicAuth);
+		}
+		
 		conn.setRequestProperty("Connection", "keep-alive");
 		conn.setRequestProperty("Accept-Language", "ru,en-GB;q=0.8,en;q=0.6");
-//		conn.setRequestProperty("Accept-Charset", "utf-8");
 		conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,"
 				+ "application/xml;q=0.9,image/webp,*/*;q=0.8");
-		//conn.setReadTimeout(10000);
 		conn.setConnectTimeout(10000);
 		if (cookies != null) {
 			conn.setRequestProperty("Cookie", cookies);
@@ -330,5 +360,9 @@ public class HttpRequest {
 		}
 		
 		return content;
+	}
+	
+	private String b64Encode(String data) {
+		return new String(Base64.getEncoder().encode(data.getBytes()));
 	}
 }
