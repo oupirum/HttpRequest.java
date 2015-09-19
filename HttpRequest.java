@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -18,12 +19,14 @@ import java.util.Map;
 /**
  * Sending GET & POST requests
  * 
- * @version 1.2.5 <br/>
- * Last upd: 10.07.15 <br/>
+ * @version 1.2.6 <br/>
+ * Last upd: 17.09.15 <br/>
  * 
  * @author Constantine Oupirum <br/>
  */
 public class HttpRequest {
+	private String charset = "UTF-8";
+	
 	private boolean cookies = true;
 	private int cookiesAmount = 5;
 	private ArrayList<String> cookiesList = new ArrayList<String>(cookiesAmount);
@@ -195,15 +198,15 @@ public class HttpRequest {
 		
 		private boolean used = false;
 		private ByteArrayOutputStream bytes;
-		private String postData = "Content-Type: multipart/form-data;boundary=" +
-				boundary + crlf + crlf;
+		private String postData = "Content-Type: multipart/form-data;charset=" + charset 
+				+ ";boundary=" + boundary + crlf + crlf;
 		
 		public FormData() throws IOException {
 			init();
 		}
 		
 		public byte[] getAsBytes() throws IOException {
-			write((twoHyphens + boundary + twoHyphens + crlf).getBytes());
+			write((twoHyphens + boundary + twoHyphens + crlf).getBytes(charset));
 			byte[] b = bytes.toByteArray();
 			used = true;
 			try {
@@ -221,7 +224,7 @@ public class HttpRequest {
 			data += crlf;
 			data += dataString;
 			data += crlf;
-			write(data.getBytes());
+			write(data.getBytes(charset));
 		}
 		
 		public void addFile(String name, File file) throws IOException {
@@ -231,20 +234,20 @@ public class HttpRequest {
 			data += "Content-Type: application/octet-stream" + crlf;
 			data += "Content-Length: " + file.length() + crlf;
 			data += crlf;
-			write(data.getBytes());
+			write(data.getBytes(charset));
 			
 			byte[] fileBytes = getFileBytes(file);
 			write(fileBytes);
 			
 			data = crlf;
-			write(data.getBytes());
+			write(data.getBytes(charset));
 		}
 		
 		
 		private void init() throws IOException {
 			used = false;
 			bytes = new ByteArrayOutputStream();
-			write(postData.getBytes());
+			write(postData.getBytes(charset));
 		}
 		
 		private void write(byte[] bytesData) throws IOException {
@@ -327,7 +330,8 @@ public class HttpRequest {
 		}
 		if (method.toLowerCase().equals("post")) {
 			conn.setRequestProperty("Content-Type",
-					"multipart/form-data;boundary=" + FormData.boundary);
+					"multipart/form-data;charset=" + charset 
+					+ ";boundary=" + FormData.boundary);
 			conn.setDoOutput(true);
 		}
 		conn.setDoInput(true);
@@ -363,6 +367,11 @@ public class HttpRequest {
 	}
 	
 	private String b64Encode(String data) {
-		return new String(Base64.getEncoder().encode(data.getBytes()));
+		try {
+			return new String(Base64.getEncoder().encode(data.getBytes(charset)));
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+			return null;
+		}
 	}
 }
