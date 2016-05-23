@@ -3,7 +3,7 @@ Sending HTTP Post &amp; Get requests with simple interface.
 
 How to use:
     
-    boolean withCookies = true
+    boolean withCookies = true;
     HttpRequest http = new HttpRequest(withCookies);
     
     // POST file upload:
