@@ -16,10 +16,10 @@ import java.util.Map;
 
 
 /**
- * Sending GET & POST requests in Android
+ * Sending GET & POST requests
  * 
  * @version 1.2.6 <br/>
- * Last upd: 2015.02.02 <br/>
+ * Last upd: 17.09.15 <br/>
  * 
  * @author Constantine Oupirum <br/>
  */
