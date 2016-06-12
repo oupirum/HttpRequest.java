@@ -92,7 +92,7 @@ public class HttpRequest {
 
 	private ReqBody constructMPFormData(Map<String, Object> data) {
 		if (data != null) {
-			FormData formdata = new FormData(charset);
+			FormData formdata = new FormData();
 			Map<String, Object> keys = data;
 			for (String name : keys.keySet()) {
 				Object obj = data.get(name);
@@ -193,12 +193,10 @@ public class HttpRequest {
 	
 	protected byte[] readResp(InputStream in) throws IOException {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		int len = 0;
 		int rdn = 0;
 		byte[] resB = new byte[1024];
 		while ((rdn = in.read(resB)) >= 0) {
 			out.write(resB, 0, rdn);
-			len += rdn;
 		}
 		out.flush();
 		byte[] arr = out.toByteArray();

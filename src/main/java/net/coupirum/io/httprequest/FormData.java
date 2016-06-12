@@ -5,7 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 
 /**
  * multipart/form-data implementation
@@ -16,33 +16,30 @@ class FormData implements ReqBody {
 	static final String boundary = "*****kjdfsdoamdnaodfns*****";
 	private static final String crlf = "\r\n";
 	private static final String twoHyphens = "--";
+	private static final String defCharset = "UTF-8";
 	
-	private String charset = "UTF-8";
 	private boolean used = false;
 	private ByteArrayOutputStream bytes;
 	private String postData;
 	
-	public FormData(String charset) {
-		this.charset = charset;
+	public FormData() {
 		init();
 	}
 	
 	private void init() {
-		postData = "Content-Type: multipart/form-data;charset=" + charset 
-				+ ";boundary=" + boundary + crlf + crlf;
+		postData = "Content-Type: multipart/form-data; "
+				+ "boundary=" + boundary + crlf + crlf;
 		used = false;
 		bytes = new ByteArrayOutputStream();
-		try {
-			write(postData.getBytes(charset));
-		} catch (UnsupportedEncodingException e) {
-			throw new RuntimeException(e);
-		}
+		write(postData.getBytes(
+				Charset.forName(defCharset)));
 	}
 	
 	@Override
 	public byte[] toBytes() {
 		try {
-			write((twoHyphens + boundary + twoHyphens + crlf).getBytes(charset));
+			write((twoHyphens + boundary + twoHyphens + crlf).getBytes(
+					Charset.forName(defCharset)));
 			byte[] b = bytes.toByteArray();
 			used = true;
 			bytes.close();
@@ -52,18 +49,19 @@ class FormData implements ReqBody {
 		}
 	}
 	
-	public void addString(String name, String dataString) {
+	public void addString(String name, String value) {
+		addString(name, value, defCharset);
+	}
+	
+	public void addString(String name, String value, String charset) {
 		String data = twoHyphens + boundary + crlf;
-		data += "Content-Disposition: form-data; name=\"" + name + "\"" +
-				crlf;
+		data += "Content-Disposition: form-data; name=\"" + name + "\"" + crlf;
+		data += "Content-Type: text/plain; charset=" + charset + crlf;
 		data += crlf;
-		data += dataString;
+		data += value;
 		data += crlf;
-		try {
-			write(data.getBytes(charset));
-		} catch (UnsupportedEncodingException e) {
-			throw new RuntimeException(e);
-		}
+		write(data.getBytes(
+				Charset.forName(charset)));
 	}
 	
 	public void addFile(String name, File file) {
@@ -73,17 +71,13 @@ class FormData implements ReqBody {
 		data += "Content-Type: application/octet-stream" + crlf;
 		data += "Content-Length: " + file.length() + crlf;
 		data += crlf;
-		try {
-			write(data.getBytes(charset));
-			
-			byte[] fileBytes = getFileContent(file);
-			write(fileBytes);
-			
-			data = crlf;
-			write(data.getBytes(charset));
-		} catch (UnsupportedEncodingException e) {
-			throw new RuntimeException(e);
-		}
+		write(data.getBytes(Charset.forName(defCharset)));
+		
+		byte[] fileBytes = getFileContent(file);
+		write(fileBytes);
+		
+		data = crlf;
+		write(data.getBytes(Charset.forName(defCharset)));
 	}
 	
 	private void write(byte[] bytesData) {
@@ -107,7 +101,7 @@ class FormData implements ReqBody {
 					inputStream = new BufferedInputStream(
 							new FileInputStream(file));
 					byte[] buffer = new byte[length];
-					int d = inputStream.read(buffer);
+					inputStream.read(buffer);
 					return buffer;
 				} catch (Exception e) {
 					throw new RuntimeException(e);
